@@ -1,152 +1,69 @@
-# C-UASC Green X: Blender model + vision center detection (Mac starter)
+## Aerial Target Localization: Finding the Green X
 
-This starter project covers **Task #2: identify the green X and report its center pixel**. It includes:
+I'm building a vision system that finds the center of the package-recovery
+marker for the [C-UASC 2026](https://www.calstatela.edu/ecst/c-uasc) drone
+competition: a white square with a green X, seen from the air.
 
-- `model/green_x.obj`, `model/green_x.mtl`: ready-to-import **true 3D**, meter-scale model, created without Blender.
-- `model/spec.json`: specifications and assumptions.
-- `blender/generate_green_x.py`: creates Blender `.blend` model, exports OBJ, renders labeled drone-view PNG images.
-- `vision/baseline.py`: first center detector, classical color segmentation (no training).
-- `vision/train.py`: learns **a spatial probability heatmap** from Blender renders, using a small CNN.
-- `vision/predict.py`: predicts `(x, y)` and saves an overlaid heatmap visualization.
+![alt text](image.png)
 
-## 0. What the competition actually specifies
+*A synthetic aerial frame. Blue is the detected square, red is the predicted center.*
 
-Official source: [Cal State LA C-UASC](https://www.calstatela.edu/ecst/c-uasc), **2026 rules Rev 3, February 23, 2026, page 13**:
-https://www.calstatela.edu/sites/default/files/C-UASC%202026%20Competition%20Rules%20rev%203%202026-02-23_accessible.pdf
+## Why I built this
+The drone vision requires identifying a green X marker midflight for package retrieval. So in this project, I wanted to train a model that learns from a 2D probability heatmap to detect the X. My previous model training focused only on numerical data, so incorporating the generated visuals from Blender was a learning experience.
 
-> Package-recovery marker: approximately **5 m in diameter**, white background, green X, with the pickup package at the intersection.
+## How it works
 
-The rulebook's sketch (included at `reference/competition_target_excerpt.png`) is a **white square with two relatively thin green diagonal lines extending corner to corner**. The thin black perimeter line in the illustration is not necessarily part of the physical target. **It does not state exact square side length, line width, color code, or actual materials.** The included default approximates a **5 m corner-to-corner diagonal** (square side ~**3.536 m**) and assumes **0.06 m thick green strokes**. These are **modeling assumptions, not confirmed competition dimensions**. The upcoming 2027 geometry should be verified with organizers/vision lead.
+1. **Synthetic data.** I modeled the target in Blender and rendered aerial
+   frames with random camera angle, altitude, and lighting. Blender knows where the true center is, so every
+   frame comes with a free label.
+2. **Find the white square.** The detector locates the square's four corners
+   and takes the point where its diagonals cross as the center.
+3. **Check for the green X.** It flattens the square to a top-down view and
+   looks for green along both diagonals, to reject white squares that aren't
+   the target.
 
-To try a **5 m square side** instead, use `--size-mode side --span-m 5.0`. The project is parameterized so assumptions can be updated with one command.
+<img src="output/verified_frame1_warped.png" width="220"> <img src="output/verified_frame1_green.png" width="220">
 
-## 1. Install Blender and open the real 3D asset (no coding needed)
+*The flattened square and the green found along its diagonals.*
 
-1. Check **Apple menu > About This Mac** for your chip: use current Blender on **Apple Silicon**, or **Blender 4.5 LTS on Intel** (Blender 5.x does not run on Intel). Download from https://www.blender.org/download/.
-2. Open the macOS `.dmg`, drag `Blender.app` to **Applications**, and launch it.
-3. In Blender, delete the startup cube, then **File > Import > Wavefront (.obj)**.
-4. Import `model/green_x.obj` (keep its `.mtl` file beside it for colors). Set import **Forward Axis: Y**, **Up Axis: Z**, and Scale 1.0.
-5. Go to **View > Viewpoint > Top**, then **View > Frame All**; enable **Material Preview** to see green/white colors.
-6. In Scene Units choose **Metric**. Use the `N` panel to inspect dimensions. The white square's default side length is ~3.536 m, with a 5.0 m diagonal.
-7. **File > Save As** `model/green_x.blend`. Complete beginner steps are in `QUICKSTART.md`.
+## Results
 
-If the target is very small relative to the Blender grid, that is normal: the geometry uses real-world meters.
+I tested across 200 synthetic 256×256 frames, 57 of them with the center covered.
 
-## 2. Configure VS Code on your Mac
+| Detector | Targets found | Mean center error |
+|---|---|---|
+| White square only | 197 / 200 | 1.52 px |
+| White square + strict green check | 187 / 200 | 1.51 px |
+| White square + tuned green check | 196 / 200 | 1.53 px |
 
-Open the `cuasc_green_x` folder in VS Code's **File > Open Folder**. Open its integrated terminal, and run:
+The largest error on any detected frame was 3.1 px.
+
+## Lessons learned
+- Diagnose why detections fail before tuning thresholds via `vision/diagnose_misses.py` 
+- Co-analyze color segmentation and geometry for more reliable localization
+- Evaluate performance under occlusion and varying camera angles
+
+## Upcoming improvements
+- Add frames with no target, so the system can report "not present"
+- Train a CNN heatmap model in `vision/train.py` and compare it with the
+  detector above on the same 200 frames
+- Evaluate performances on real drone photos
+
+## Run it
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
 pip install -r requirements.txt
+python vision/baseline_v2.py output_test/dataset/images/frame_00000.png --verify-green
+python vision/evaluate.py --dataset output_test/dataset
 ```
 
-On an Apple Silicon Mac, `train.py` uses **MPS** when supported. On Intel Mac, it uses CPU. This is independent of Blender's embedded Python: **do not install PyTorch inside Blender** for this project.
+Full setup, including generating the dataset in Blender, is in
+[SETUP.md](SETUP.md) and [QUICKSTART.md](QUICKSTART.md).
 
-## 3. Generate the Blender scene and aerial-image dataset
+## The target
 
-From the project's root folder in VS Code's terminal:
+<img src="examples/green_x_plan_view.png" width="320" alt="Plan view of the target model">
 
-```bash
-/Applications/Blender.app/Contents/MacOS/Blender -b --python blender/generate_green_x.py -- --out output --samples 250 --size 256 --size-mode diagonal --span-m 5.0 --stroke-width-m 0.10
-```
-
-If `blender` is already on your `PATH`, you can shorten `/Applications/Blender.app/Contents/MacOS/Blender` to `blender`.
-
-The script produces:
-
-```
-output/
-  model/
-    green_x.blend       # Open in Blender
-    green_x.obj         # Mesh for Isaac Sim / other software
-    green_x.mtl         # May be generated by OBJ exporter
-    spec.json           # Assumptions / dimensions
-  dataset/
-    images/
-      frame_00000.png
-      frame_00001.png
-      ...
-    labels.csv          # Each filename + ground-truth center x,y
-```
-
-The generator makes varied camera angles, altitude, rotation, lighting, backdrop, and occasional approximate bucket occlusions. The white square, strokes and ground are simple scene assets, not photorealistic field scans. No drone/Isaac Sim required to produce the images.
-
-To render 5 quick test frames first, replace `--samples 250` with `--samples 5`. After checking they look reasonable, run the full dataset command.
-
-### Optional: tune dimensions
-
-- `--span-m 5.0 --size-mode diagonal`: nominal **5 m square diagonal** (default).
-- `--span-m 5.0 --size-mode side`: nominal **5 m square side**.
-- `--stroke-width-m 0.12`: double the assumed green stripe width.
-- `--no-occlusion`: don't draw the placeholder bucket.
-
-## 4. Verify labels and run an untrained baseline
-
-```bash
-python vision/check_dataset.py output/dataset
-python vision/baseline.py output/dataset/images/frame_00000.png
-```
-
-Open `output/baseline_result.png` and `output/baseline_result_mask.png` to inspect the mask and detected red cross. This identifies green-ish pixels and uses their connected-component centroid, with a rough neighboring-white filter.
-
-**Expected weaknesses:** similar green objects/grass, shadows, small or blurred X strokes, partial occlusion. Treat it as a baseline, not a competition-ready detector.
-
-## 5. Train your simple machine-learning model
-
-```bash
-python vision/train.py --dataset output/dataset --epochs 20 --batch-size 8
-```
-
-It learns a **2D spatial probability heatmap**: the output has one probability per pixel, whose total sums to 1, with the center location receiving most of the probability mass. Labels are automatically generated by projecting the known 3D target center through Blender's camera.
-
-Training prints **validation mean center error (pixels)**. It saves the best model to `output/green_x_model.pt`. Evaluate on held-out images rather than memorized training views. A good first target is **<5 px** mean error on a 256x256 synthetic validation set; treat this as an engineering goal, not a guaranteed result. Try 500+ renders if results are poor.
-
-## 6. Predict on an unseen image
-
-```bash
-IMG=$(head -n 1 output/validation_files.txt)
-python vision/predict.py "output/dataset/images/$IMG"
-```
-
-Look for output like:
-
-```
-Predicted center original-image pixels: (121.0, 104.0)
-Heatmap overlay: output/prediction_overlay.png
-```
-
-Use the provided `validation_files.txt` to choose a held-out evaluation image, not a training image. The output varies by image and training. Image coordinates use the usual computer-vision convention: **(0,0) top left**, x rightward, y downward. The heatmap's peak is **not** a calibrated probability that a green X exists: the current model always nominates one location.
-
-### To test on your own photo
-
-```bash
-python vision/predict.py path/to/drone_photo.jpg --out output/my_photo_prediction.png
-```
-
-Its results on real photos can be poor unless you add realistic textures, hard negatives, shadows, motion blur, camera intrinsics, resolution matching, and preferably real labeled data.
-
-## 7. Later: import asset into Isaac Sim on a lab server
-
-The OBJ file is already standard mesh geometry: you can import it in an Isaac Sim USD stage or convert it to USD using a tool your lab supports. **Keep the target dimensions in meters** and its center near the stage origin. Verify material colors after import: OBJ/MTL materials do not always map directly to USD shader materials.
-
-For robust Isaac Sim integration, obtain camera intrinsics/FOV, flight heights, color response and real competition cloth appearance from your team. Then reproduce scene randomization and center projection in Isaac Sim.
-
-## 8. Definition of done (deliver to your vision lead)
-
-- [ ] **Model**: `.blend` and `.obj`, correct units, assumptions documented.
-- [ ] **Samples**: aerial-view PNGs at varied camera angles, with labels CSV.
-- [ ] **Baseline**: `(x, y)` from OpenCV on a representative frame.
-- [ ] **Learned model**: predicted `(x, y)` and overlaid heatmap for unseen frame.
-- [ ] **Metrics**: validation error in pixels, image resolution, camera height ranges.
-- [ ] **Known gaps**: no negative class / unknown target geometry / sim-to-real shift.
-
-## Important engineering notes
-
-- The 5-meter size is a **world-space physical measurement**, not a pixel size. Apparent pixel size depends on distance, perspective and camera intrinsics.
-- The optional bucket placeholder approximates occlusion but **is not a verified 3 L bucket model**.
-- A center probability heatmap and an **object-exists probability** are distinct outputs. The starter covers the former only; add negative examples and an objectness head or separate classifier to detect absence.
-- A detected **pixel center is not a GPS coordinate**. World localization additionally needs calibrated camera geometry and UAV pose.
-- Isaac Sim generally requires compatible GPU/OS infrastructure, so keeping Blender+training local on macOS and testing Isaac Sim in the lab makes sense.
+The rules give a marker of about 5 m with a green X on white, but not the
+exact side length or stripe width. Those are my assumptions and are recorded
+in `model/spec.json`.
