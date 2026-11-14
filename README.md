@@ -22,7 +22,7 @@ The drone vision requires identifying a green X marker midflight for package ret
    looks for green along both diagonals, to reject white squares that aren't
    the target.
 
-<img src="output/verified_frame1_warped.png" width="220"> <img src="output/verified_frame1_green.png" width="220">
+![alt text](image-1.png)<img src="output/verified_frame1_warped.png" width="220"> <img src="output/verified_frame1_green.png" width="220">
 
 *The flattened square and the green found along its diagonals.*
 
@@ -48,7 +48,6 @@ The largest error on any detected frame was 3.1 px.
 - Train a CNN heatmap model in `vision/train.py` and compare it with the
   detector above on the same 200 frames
 - Evaluate performances on real drone photos
-
 ## Run it
 
 ```bash
