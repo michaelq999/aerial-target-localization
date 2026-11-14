@@ -1,0 +1,14 @@
+{
+  "source": "C-UASC 2026 official rules, page 13 (Rev 3, Feb 23 2026)",
+  "official": "Target approximately 5 meters in diameter, white with green X. Exact square side and stripe width not specified.",
+  "span_m": 5.0,
+  "size_mode": "diagonal",
+  "square_side_m": 3.5355339059327373,
+  "stroke_width_m_assumed": 0.06,
+  "target_center_world_m": [
+    0,
+    0,
+    0.0154
+  ],
+  "warning": "Model dimensions beyond ~5m overall size are simulation assumptions, not competition-certified."
+}

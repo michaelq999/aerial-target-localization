@@ -1,0 +1,16 @@
+{
+  "source": "C-UASC 2026 official rules (Rev 3, 2026-02-23), p.13",
+  "official": "Target approximately 5 meters in diameter with white background and green X.",
+  "geometry_note": "Square side and stroke width not specified by competition. Change Blender generator arguments if clarified.",
+  "span_m": 5.0,
+  "size_mode": "diagonal",
+  "square_side_m": 3.5355339059327373,
+  "stroke_width_m_assumed": 0.06,
+  "board_thickness_m_assumed": 0.01,
+  "model_units": "meters",
+  "target_center_world_m": [
+    0,
+    0,
+    0.0154
+  ]
+}

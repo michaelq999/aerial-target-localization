@@ -1,0 +1,13 @@
+newmtl White_Matte
+Ka 0.2 0.2 0.2
+Kd 0.92 0.91 0.87
+Ks 0 0 0
+Ns 10
+illum 2
+
+newmtl Green_Matte
+Ka 0.03 0.1 0.03
+Kd 0.025 0.50 0.10
+Ks 0 0 0
+Ns 10
+illum 2
